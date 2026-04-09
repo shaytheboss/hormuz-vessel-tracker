@@ -22,27 +22,23 @@ st.markdown("""
 st.title("🚢 ניטור מצרי הורמוז - מאגר נתונים מצטבר")
 st.write("המערכת מושכת נתונים ממאגר המידע המרוחק בענף ה-Data")
 
+
 def load_data():
-    # כתובת הקובץ בענף הנתונים (data branch)
-    db_url = "https://github.com/shaytheboss/hormuz-vessel-tracker/raw/data/hormuz_ships.db"
-    local_db = "local_hormuz_ships.db"
+    import urllib.request
+    import os
+    # הכתובת הישירה לקובץ בענף ה-data
+    db_url = "https://raw.githubusercontent.com/shaytheboss/hormuz-vessel-tracker/data/hormuz_ships.db"
+    local_db = "local_ships.db"
     
     try:
-        # הורדת הקובץ מגיטהאב לסביבת העבודה של Streamlit
+        # הורדה של הקובץ מהשרת
         urllib.request.urlretrieve(db_url, local_db)
-        
-        # התחברות וקריאה
         conn = sqlite3.connect(local_db)
         df = pd.read_sql("SELECT * FROM ship_logs ORDER BY timestamp DESC", conn)
         conn.close()
-        
-        # ניקוי: מחיקת הקובץ המקומי אחרי הטעינה (אופציונלי)
-        if os.path.exists(local_db):
-            os.remove(local_db)
-            
         return df
     except Exception as e:
-        # אם הקובץ עדיין לא קיים (לפני ההרצה הראשונה של ה-Action)
+        st.error(f"שגיאת חיבור למאגר: {e}")
         return pd.DataFrame()
 
 # טעינת הנתונים
