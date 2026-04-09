@@ -33,7 +33,8 @@ jobs:
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
+          git pull --rebase origin main  # השורה הזו פותרת את הבעיה - היא תביא את השינויים שלך קודם
           git add hormuz_ships.db
           git commit -m "Real-time DB update" || exit 0
-          git push
-          
+          git push origin main
+
