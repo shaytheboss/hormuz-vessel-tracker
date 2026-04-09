@@ -4,68 +4,63 @@ import os
 import datetime
 
 def fetch_real_data():
-    # משיכת הטוקן מההגדרות המאובטחות של GitHub
     api_token = os.getenv("AIS_TOKEN")
     if not api_token:
-        print("Error: No API token found!")
+        print("CRITICAL: No AIS_TOKEN found in environment variables!")
         return []
 
-    # הגדרת האזור הגיאוגרפי של מצרי הורמוז (Polygon)
-    url = "https://api.aisstream.io/v1/vessels"
+    # שימוש בפורמט ה-URL הישיר של AISStream
+    url = f"https://api.aisstream.io/v1/vessels?apiKey={api_token}"
     
-    # אנחנו נשתמש ב-Bounding Box פשוט למצרים
-    # Lat: 26.0 to 27.5, Lon: 55.0 to 57.0
-    params = {
-        "apiKey": api_token,
-        "mmsi": "", # נשאיר ריק כדי לקבל את כל הספינות באזור
-        "boxtopleft": "27.5,55.0",
-        "boxbottomright": "26.0,57.0"
+    # הגדרת אזור מצרי הורמוז
+    payload = {
+        "bounding_box": [[55.0, 26.0], [57.0, 27.5]]
     }
 
     try:
-        # הערה: AISStream משתמש לעיתים ב-WebSockets, אבל יש להם גם REST API פשוט
-        # כאן אנחנו מדמים את המבנה של התגובה שלהם
-        response = requests.get(url, params=params, timeout=20)
+        print(f"Attempting to fetch data from AISStream...")
+        response = requests.post(url, json=payload, timeout=15)
+        
+        print(f"Response Status: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
-            # עיבוד הנתונים (תלוי במבנה ה-JSON המדויק שלהם)
+            print(f"Received {len(data)} potential targets.")
             vessels = []
-            for item in data.get('entries', []):
+            for entry in data:
                 vessels.append((
-                    str(item.get('mmsi')),
-                    item.get('name', 'Unknown'),
-                    item.get('type_str', 'Other'),
-                    item.get('flag', 'Unknown'),
-                    item.get('lat'),
-                    item.get('lon'),
+                    str(entry.get('mmsi')),
+                    entry.get('name', 'Unknown'),
+                    entry.get('type_str', 'Vessel'),
+                    entry.get('flag', 'Unknown'),
+                    entry.get('last_location', {}).get('lat'),
+                    entry.get('last_location', {}).get('lon'),
                     datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ))
             return vessels
         else:
-            print(f"API Error: {response.status_code}")
+            print(f"API Error Details: {response.text}")
             return []
     except Exception as e:
-        print(f"Error fetching data: {e}")
+        print(f"Connection Error: {e}")
         return []
 
-def update_db(vessels):
+def save_to_db(vessels):
     conn = sqlite3.connect('hormuz_ships.db')
     c = conn.cursor()
-    
-    # וידוא שהטבלה קיימת
     c.execute('''CREATE TABLE IF NOT EXISTS ship_logs
                  (mmsi TEXT, name TEXT, ship_type TEXT, country TEXT, 
                   lat REAL, lon REAL, timestamp DATETIME)''')
-
-    # הכנסת הנתונים החדשים
+    
     if vessels:
         c.executemany("INSERT INTO ship_logs VALUES (?, ?, ?, ?, ?, ?, ?)", vessels)
-        print(f"Added {len(vessels)} new ship records.")
+        print(f"Successfully inserted {len(vessels)} rows.")
+    else:
+        print("No vessels to insert this time.")
     
     conn.commit()
     conn.close()
 
 if __name__ == "__main__":
     ships = fetch_real_data()
-    update_db(ships)
-    
+    save_to_db(ships)
