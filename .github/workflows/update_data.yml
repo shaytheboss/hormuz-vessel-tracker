@@ -28,13 +28,16 @@ jobs:
         env:
           AIS_TOKEN: ${{ secrets.AIS_TOKEN }} # מחבר את הסוד שהגדרת ב-Settings
         run: python collector.py
-
+        
       - name: Commit and Push changes
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
-          git pull --rebase origin main  # השורה הזו פותרת את הבעיה - היא תביא את השינויים שלך קודם
+          # משיכה של השינויים האחרונים מהטלפון כדי למנוע את ה-Rejected
+          git pull origin main --rebase
           git add hormuz_ships.db
-          git commit -m "Real-time DB update" || exit 0
+          # ה-exit 0 מבטיח שהתהליך לא ייכשל אם אין שינויים ב-DB
+          git commit -m "Automated DB update" || exit 0
           git push origin main
-
+          
+     
