@@ -3,6 +3,8 @@ import json
 import sqlite3
 import os
 import datetime
+import threading
+import time
 
 def on_message(ws, message):
     msg = json.loads(message)
@@ -24,11 +26,9 @@ def on_message(ws, message):
         conn.commit()
         conn.close()
         print(f"Captured: {meta.get('ShipName')}")
-        ws.close() # עוצר אחרי ספינה אחת כדי לוודא שזה עובד
 
 def run():
     token = os.getenv("AIS_TOKEN")
-    # הודעת התחברות ל-AISStream
     auth_msg = {
         "APIKey": token, 
         "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]
@@ -40,7 +40,16 @@ def run():
         on_message=on_message,
         on_error=lambda ws, err: print(f"Error: {err}")
     )
-    ws.run_forever(timeout=25)
+
+    # מנגנון סגירה אוטומטית אחרי 20 שניות כדי שה-Action יסתיים
+    thread = threading.Thread(target=ws.run_forever)
+    thread.daemon = True
+    thread.start()
+    
+    print("Listening for ships in Hormuz Strait...")
+    time.sleep(20)
+    ws.close()
+    print("Collection period finished.")
 
 if __name__ == "__main__":
     run()
