@@ -1,18 +1,20 @@
 name: Hourly Ship Update
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # מאפשר הרצה ידנית בלחיצת כפתור
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *' # ירוץ אוטומטית כל 6 שעות
 
 jobs:
   update_db:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # חיוני כדי שהבוט יוכל לכתוב לענף ה-data
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -20,7 +22,9 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install requests pandas
+        run: |
+          python -m pip install --upgrade pip
+          pip install websocket-client pandas requests
 
       - name: Run collector
         env:
@@ -29,10 +33,17 @@ jobs:
 
       - name: Commit to Data Branch
         run: |
-          git config --global user.name "ShipBot"
-          git config --global user.email "bot@github.com"
-          # יצירת ענף דאטה נפרד אם הוא לא קיים
-          git checkout -b data || git checkout data
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # מעבר לענף data (יצירה שלו אם אינו קיים)
+          git checkout -B data
+          
+          # הוספת קובץ ה-Database בלבד
           git add hormuz_ships.db
-          git commit -m "Cumulative update: $(date)" || exit 0
+          
+          # ביצוע Commit רק אם יש שינויים
+          git commit -m "Automated data update: $(date)" || exit 0
+          
+          # דחיפה בכוח לענף הנתונים
           git push origin data --force
