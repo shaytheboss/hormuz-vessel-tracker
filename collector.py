@@ -6,6 +6,15 @@ import datetime
 import threading
 import time
 
+def create_table_if_not_exists():
+    conn = sqlite3.connect('hormuz_ships.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS ship_logs
+                 (mmsi TEXT, name TEXT, ship_type TEXT, country TEXT, 
+                  lat REAL, lon REAL, timestamp DATETIME)''')
+    conn.commit()
+    conn.close()
+
 def on_message(ws, message):
     msg = json.loads(message)
     meta = msg.get("MetaData", {})
@@ -14,12 +23,9 @@ def on_message(ws, message):
     if meta and pos:
         conn = sqlite3.connect('hormuz_ships.db')
         c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS ship_logs
-                     (mmsi TEXT, name TEXT, ship_type TEXT, country TEXT, 
-                      lat REAL, lon REAL, timestamp DATETIME)''')
-        
-        data = (str(meta.get("MMSI")), meta.get("ShipName"), meta.get("ShipType"),
-                meta.get("Flag"), pos.get("Latitude"), pos.get("Longitude"),
+        data = (str(meta.get("MMSI")), meta.get("ShipName", "Unknown").strip(), 
+                meta.get("ShipType"), meta.get("Flag"), 
+                pos.get("Latitude"), pos.get("Longitude"),
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
         c.execute("INSERT INTO ship_logs VALUES (?,?,?,?,?,?,?)", data)
@@ -28,6 +34,9 @@ def on_message(ws, message):
         print(f"Captured: {meta.get('ShipName')}")
 
 def run():
+    # וידוא קיום טבלה לפני הכל
+    create_table_if_not_exists()
+    
     token = os.getenv("AIS_TOKEN")
     auth_msg = {
         "APIKey": token, 
@@ -41,13 +50,13 @@ def run():
         on_error=lambda ws, err: print(f"Error: {err}")
     )
 
-    # מנגנון סגירה אוטומטית אחרי 20 שניות כדי שה-Action יסתיים
     thread = threading.Thread(target=ws.run_forever)
     thread.daemon = True
     thread.start()
     
-    print("Listening for ships in Hormuz Strait...")
-    time.sleep(20)
+    print("Listening for ships in Hormuz Strait for 60 seconds...")
+    # הגדלנו לדקה שלמה כדי להבטיח תפיסת נתונים
+    time.sleep(60)
     ws.close()
     print("Collection period finished.")
 
