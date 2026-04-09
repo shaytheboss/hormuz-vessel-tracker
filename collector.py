@@ -6,7 +6,6 @@ import datetime
 
 def on_message(ws, message):
     msg = json.loads(message)
-    # שליפת נתונים בסיסיים
     meta = msg.get("MetaData", {})
     pos = msg.get("Message", {}).get("PositionReport", {})
     
@@ -25,18 +24,23 @@ def on_message(ws, message):
         conn.commit()
         conn.close()
         print(f"Captured: {meta.get('ShipName')}")
-        ws.close() # סוגר אחרי ספינה אחת לבדיקה
+        ws.close() # עוצר אחרי ספינה אחת כדי לוודא שזה עובד
 
 def run():
     token = os.getenv("AIS_TOKEN")
-    auth_msg = {"APIKey": token, "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]}
+    # הודעת התחברות ל-AISStream
+    auth_msg = {
+        "APIKey": token, 
+        "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]
+    }
     
     ws = websocket.WebSocketApp(
         "wss://stream.aisstream.io/v1/stream",
         on_open=lambda ws: ws.send(json.dumps(auth_msg)),
-        on_message=on_message
+        on_message=on_message,
+        on_error=lambda ws, err: print(f"Error: {err}")
     )
-    ws.run_forever(timeout=20)
+    ws.run_forever(timeout=25)
 
 if __name__ == "__main__":
     run()
