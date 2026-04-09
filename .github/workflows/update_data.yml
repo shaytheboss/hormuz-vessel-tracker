@@ -1,7 +1,7 @@
 name: Hourly Ship Update
 
 on:
-  workflow_dispatch: # מאפשר לך להריץ ידנית מהטלפון
+  workflow_dispatch: # זה השורה שיוצרת את הכפתור הידיני
 
 jobs:
   update_db:
