@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import urllib.request
+import os
 
 # הגדרות עמוד
-st.set_page_config(page_title="Hormuz Watcher", layout="wide")
+st.set_page_config(page_title="Hormuz Vessel Tracker", layout="wide")
 
-# תיקון השגיאה: שימוש ב-unsafe_allow_html=True
+# עיצוב בסיסי ב-CSS
 st.markdown("""
     <style>
     .stMetric {
@@ -17,38 +19,74 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🚢 Hormuz Strait Traffic Control")
-st.write("ניטור תנועה ימית בזמן אמת - מצרי הורמוז")
+st.title("🚢 ניטור מצרי הורמוז - מאגר נתונים מצטבר")
+st.write("המערכת מושכת נתונים ממאגר המידע המרוחק בענף ה-Data")
 
 def load_data():
+    # כתובת הקובץ בענף הנתונים (data branch)
+    db_url = "https://github.com/shaytheboss/hormuz-vessel-tracker/raw/data/hormuz_ships.db"
+    local_db = "local_hormuz_ships.db"
+    
     try:
-        conn = sqlite3.connect('hormuz_ships.db')
+        # הורדת הקובץ מגיטהאב לסביבת העבודה של Streamlit
+        urllib.request.urlretrieve(db_url, local_db)
+        
+        # התחברות וקריאה
+        conn = sqlite3.connect(local_db)
         df = pd.read_sql("SELECT * FROM ship_logs ORDER BY timestamp DESC", conn)
         conn.close()
+        
+        # ניקוי: מחיקת הקובץ המקומי אחרי הטעינה (אופציונלי)
+        if os.path.exists(local_db):
+            os.remove(local_db)
+            
         return df
-    except:
+    except Exception as e:
+        # אם הקובץ עדיין לא קיים (לפני ההרצה הראשונה של ה-Action)
         return pd.DataFrame()
 
+# טעינת הנתונים
 df = load_data()
 
 if not df.empty:
-    # כרטיסי מידע
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("סה\"כ ספינות", len(df))
-    m2.metric("מכליות נפט", len(df[df['ship_type'] == 'Tanker']))
-    m3.metric("מדינות", df['country'].nunique())
-    m4.metric("עדכון אחרון", str(df['timestamp'].iloc[0]).split(".")[0])
+    # הצגת מדדים (KPIs)
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("סה\"כ אירועים שנרשמו", len(df))
+    with m2:
+        tankers = len(df[df['ship_type'].str.contains('Tanker', case=False, na=False)])
+        st.metric("מכליות נפט", tankers)
+    with m3:
+        last_update = df['timestamp'].iloc[0]
+        st.metric("עדכון אחרון", str(last_update).split(".")[0])
 
     st.divider()
 
-    # מפה בסיסית של Streamlit (בלי ספריות חיצוניות בינתיים כדי למנוע שגיאות)
-    st.subheader("📍 מיקומי ספינות אחרונים")
-    # Streamlit צריך עמודות בשם lat ו-lon בשביל המפה המובנית
-    map_df = df[['lat', 'lon']].dropna()
-    st.map(map_df)
+    # תצוגת מפה
+    st.subheader("📍 מפת תנועה מצטברת")
+    # סינון שורות בלי קואורדינטות
+    map_df = df.dropna(subset=['lat', 'lon'])
+    if not map_df.empty:
+        st.map(map_df[['lat', 'lon']])
 
-    st.subheader("📋 רשימת מעברים מפורטת")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.divider()
+
+    # טבלת נתונים
+    st.subheader("📋 יומן מעברים היסטורי")
+    st.dataframe(
+        df, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "timestamp": "זמן דיווח",
+            "name": "שם הספינה",
+            "ship_type": "סוג",
+            "country": "מדינה/דגל",
+            "lat": "קו רוחב",
+            "lon": "קו אורך"
+        }
+    )
 else:
-    st.info("ממתין לנתונים ראשוניים מה-Workflow...")
+    st.warning("⚠️ לא נמצאו נתונים בענף ה-Data. וודא שה-Workflow רץ לפחות פעם אחת בהצלחה.")
+    st.info("ברגע שה-Action יסתיים ב-V ירוק, הנתונים יופיעו כאן אוטומטית.")
     
