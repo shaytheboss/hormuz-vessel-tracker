@@ -2,16 +2,20 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 
-# הגדרות עמוד למראה מקצועי
-st.set_page_config(page_title="Hormuz Watcher", layout="wide", initial_sidebar_state="collapsed")
+# הגדרות עמוד
+st.set_page_config(page_title="Hormuz Watcher", layout="wide")
 
-# הוספת CSS מותאם אישית למראה כהה ונקי
+# תיקון השגיאה: שימוש ב-unsafe_allow_html=True
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; }
+    .stMetric {
+        background-color: #1f2937;
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+    }
     </style>
-    """, unsafe_allow_stdio=True)
+    """, unsafe_allow_html=True)
 
 st.title("🚢 Hormuz Strait Traffic Control")
 st.write("ניטור תנועה ימית בזמן אמת - מצרי הורמוז")
@@ -28,41 +32,23 @@ def load_data():
 df = load_data()
 
 if not df.empty:
-    # שורת מדדים עליונה
+    # כרטיסי מידע
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("סה\"כ ספינות", len(df))
     m2.metric("מכליות נפט", len(df[df['ship_type'] == 'Tanker']))
-    m3.metric("מדינות מיוצגות", df['country'].nunique())
+    m3.metric("מדינות", df['country'].nunique())
     m4.metric("עדכון אחרון", str(df['timestamp'].iloc[0]).split(".")[0])
 
-    st.markdown("---")
+    st.divider()
 
-    # חלוקה לשני טורים: מפה (בעתיד) וטבלה
-    col_table, col_chart = st.columns([2, 1])
+    # מפה בסיסית של Streamlit (בלי ספריות חיצוניות בינתיים כדי למנוע שגיאות)
+    st.subheader("📍 מיקומי ספינות אחרונים")
+    # Streamlit צריך עמודות בשם lat ו-lon בשביל המפה המובנית
+    map_df = df[['lat', 'lon']].dropna()
+    st.map(map_df)
 
-    with col_table:
-        st.subheader("📋 רשימת מעברים מפורטת")
-        # עיצוב הטבלה
-        st.dataframe(
-            df, 
-            column_config={
-                "mmsi": "ID",
-                "name": "שם הספינה",
-                "ship_type": "סוג",
-                "country": "דגל",
-                "lat": "Lat",
-                "lon": "Lon",
-                "timestamp": "זמן"
-            },
-            hide_index=True, 
-            use_container_width=True
-        )
-
-    with col_chart:
-        st.subheader("📊 פילוח לפי סוג")
-        type_counts = df['ship_type'].value_counts()
-        st.bar_chart(type_counts)
-
+    st.subheader("📋 רשימת מעברים מפורטת")
+    st.dataframe(df, use_container_width=True, hide_index=True)
 else:
-    st.info("ממתין לנתונים ראשוניים...")
+    st.info("ממתין לנתונים ראשוניים מה-Workflow...")
     
