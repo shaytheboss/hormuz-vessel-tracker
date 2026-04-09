@@ -1,51 +1,20 @@
-name: Hourly Ship Update
-
-on:
-  workflow_dispatch: # מאפשר לך להריץ ידנית מהטלפון
-  schedule:
-    - cron: '0 */6 * * *' # ירוץ אוטומטית כל 6 שעות
-
-jobs:
-  update_db:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # נותן לבוט אישור לכתוב לקבצים
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install websocket-client pandas requests
-
-      - name: Run collector
-        env:
-          AIS_TOKEN: ${{ secrets.AIS_TOKEN }}
-        run: python collector.py
-
       - name: Commit to Data Branch
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # שמירת בסיס הנתונים בצד לפני הניקוי
-          mkdir temp_db
-          cp hormuz_ships.db temp_db/ || echo "No DB yet"
+          # שמירת הדאטה בצד
+          cp hormuz_ships.db /tmp/hormuz_ships.db
           
-          # יצירת ענף data נקי מקבצי קוד (מונע שגיאת הרשאות Workflow)
-          git checkout --orphan data
+          # מעבר לענף data ויצירתו מחדש כענף ריק לגמרי (יתום)
+          git checkout --orphan data_tmp
           git rm -rf .
           
-          # החזרת בסיס הנתונים ודחיפה
-          cp temp_db/hormuz_ships.db .
+          # החזרת הקובץ בלבד
+          cp /tmp/hormuz_ships.db .
           git add hormuz_ships.db
           git commit -m "Automated data update: $(date)" || exit 0
-          git push origin data --force
+          
+          # דחיפה בכוח לענף data האמיתי
+          git push origin data_tmp:data --force
+          
