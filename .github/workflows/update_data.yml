@@ -13,8 +13,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # מושך את כל ההיסטוריה כדי למנוע בעיות מיזוג
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -22,19 +20,19 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests pandas
 
       - name: Run collector
         env:
           AIS_TOKEN: ${{ secrets.AIS_TOKEN }}
         run: python collector.py
 
-      - name: Commit and Push changes
+      - name: Commit to Data Branch
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "ShipBot"
+          git config --global user.email "bot@github.com"
+          # יצירת ענף דאטה נפרד אם הוא לא קיים
+          git checkout -b data || git checkout data
           git add hormuz_ships.db
-          git commit -m "Automated DB update" || exit 0
-          # הכוח עובר לבוט: דחיסה בכוח לענף המרכזי
-          git push origin main --force
-          
+          git commit -m "Cumulative update: $(date)" || exit 0
+          git push origin data --force
