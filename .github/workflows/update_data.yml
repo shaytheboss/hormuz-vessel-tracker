@@ -1,15 +1,15 @@
 name: Hourly Ship Update
 
 on:
-  workflow_dispatch: # מאפשר הרצה ידנית בלחיצת כפתור
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *' # ירוץ אוטומטית כל 6 שעות
+    - cron: '0 */6 * * *'
 
 jobs:
   update_db:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # חיוני כדי שהבוט יוכל לכתוב לענף ה-data
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -35,15 +35,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # מעבר לענף data (יצירה שלו אם אינו קיים)
           git checkout -B data
-          
-          # הוספת קובץ ה-Database בלבד
           git add hormuz_ships.db
-          
-          # ביצוע Commit רק אם יש שינויים
           git commit -m "Automated data update: $(date)" || exit 0
-          
-          # דחיפה בכוח לענף הנתונים
           git push origin data --force
