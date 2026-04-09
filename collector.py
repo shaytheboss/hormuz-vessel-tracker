@@ -1,49 +1,8 @@
+import websocket
+import json
 import sqlite3
-import requests
-import os
 import datetime
-
-def fetch_real_data():
-    api_token = os.getenv("AIS_TOKEN")
-    if not api_token:
-        print("CRITICAL: No AIS_TOKEN found in environment variables!")
-        return []
-
-    # שימוש בפורמט ה-URL הישיר של AISStream
-    url = f"https://api.aisstream.io/v1/vessels?apiKey={api_token}"
-    
-    # הגדרת אזור מצרי הורמוז
-    payload = {
-        "bounding_box": [[55.0, 26.0], [57.0, 27.5]]
-    }
-
-    try:
-        print(f"Attempting to fetch data from AISStream...")
-        response = requests.post(url, json=payload, timeout=15)
-        
-        print(f"Response Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Received {len(data)} potential targets.")
-            vessels = []
-            for entry in data:
-                vessels.append((
-                    str(entry.get('mmsi')),
-                    entry.get('name', 'Unknown'),
-                    entry.get('type_str', 'Vessel'),
-                    entry.get('flag', 'Unknown'),
-                    entry.get('last_location', {}).get('lat'),
-                    entry.get('last_location', {}).get('lon'),
-                    datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ))
-            return vessels
-        else:
-            print(f"API Error Details: {response.text}")
-            return []
-    except Exception as e:
-        print(f"Connection Error: {e}")
-        return []
+import os
 
 def save_to_db(vessels):
     conn = sqlite3.connect('hormuz_ships.db')
@@ -51,16 +10,46 @@ def save_to_db(vessels):
     c.execute('''CREATE TABLE IF NOT EXISTS ship_logs
                  (mmsi TEXT, name TEXT, ship_type TEXT, country TEXT, 
                   lat REAL, lon REAL, timestamp DATETIME)''')
-    
     if vessels:
         c.executemany("INSERT INTO ship_logs VALUES (?, ?, ?, ?, ?, ?, ?)", vessels)
-        print(f"Successfully inserted {len(vessels)} rows.")
-    else:
-        print("No vessels to insert this time.")
-    
-    conn.commit()
+        conn.commit()
     conn.close()
 
+def on_message(ws, message):
+    msg = json.loads(message)
+    vessel = msg.get("MetaData", {})
+    pos = msg.get("Message", {}).get("PositionReport", {})
+    
+    if vessel and pos:
+        ship_data = (
+            str(vessel.get("MMSI")),
+            vessel.get("ShipName", "Unknown").strip(),
+            vessel.get("ShipType"),
+            vessel.get("Flag"),
+            pos.get("Latitude"),
+            pos.get("Longitude"),
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        # שמירה מיידית של הספינה שמצאנו
+        save_to_db([ship_data])
+        print(f"Captured: {ship_data[1]}")
+        # אנחנו נסגור את החיבור אחרי שקיבלנו כמה ספינות כדי לא להיתקע לנצח
+        ws.close()
+
+def run_collector():
+    api_token = os.getenv("AIS_TOKEN")
+    subscribe_msg = {
+        "APIKey": api_token,
+        "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]] # מצרי הורמוז
+    }
+    
+    ws = websocket.WebSocketApp(
+        "wss://stream.aisstream.io/v1/stream",
+        on_message=on_message,
+        on_open=lambda ws: ws.send(json.dumps(subscribe_msg))
+    )
+    # נריץ למשך 30 שניות מקסימום כדי לא לחרוג מהזמן של ה-Action
+    ws.run_forever(timeout=30)
+
 if __name__ == "__main__":
-    ships = fetch_real_data()
-    save_to_db(ships)
+    run_collector()
