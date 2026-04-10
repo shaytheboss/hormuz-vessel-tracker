@@ -24,9 +24,13 @@ def on_message(ws, message):
         if meta and pos:
             conn = sqlite3.connect('hormuz_ships.db')
             c = conn.cursor()
-            data = (str(meta.get("MMSI")), meta.get("ShipName", "Unknown").strip(), 
-                    meta.get("ShipType"), meta.get("Flag"), 
-                    pos.get("Latitude"), pos.get("Longitude"),
+            # שליפת הנתונים וניקוי רווחים
+            data = (str(meta.get("MMSI")), 
+                    str(meta.get("ShipName", "Unknown")).strip(), 
+                    meta.get("ShipType"), 
+                    meta.get("Flag"), 
+                    pos.get("Latitude"), 
+                    pos.get("Longitude"),
                     datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             
             c.execute("INSERT INTO ship_logs VALUES (?,?,?,?,?,?,?)", data)
@@ -36,28 +40,36 @@ def on_message(ws, message):
     except Exception as e:
         print(f"Error processing message: {e}")
 
-def run():
-    create_table_if_not_exists()
+def on_open(ws):
+    print("Connection opened, sending subscription message...")
     token = os.getenv("AIS_TOKEN")
     auth_msg = {
         "APIKey": token, 
         "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]
     }
+    ws.send(json.dumps(auth_msg))
+
+def run():
+    create_table_if_not_exists()
+    
+    # כתובת ה-WebSocket המדויקת לפי התיעוד
+    ws_url = "wss://stream.aisstream.io/v1/stream"
     
     ws = websocket.WebSocketApp(
-        "wss://stream.aisstream.io/v1/stream",
-        on_open=lambda ws: ws.send(json.dumps(auth_msg)),
+        ws_url,
+        on_open=on_open,
         on_message=on_message,
-        on_error=lambda ws, err: print(f"Error: {err}")
+        on_error=lambda ws, err: print(f"Error: {err}"),
+        on_close=lambda ws, close_status_code, close_msg: print(f"### Closed: {close_msg} ###")
     )
 
-    thread = threading.Thread(target=ws.run_forever)
-    thread.daemon = True
-    thread.start()
+    # הרצה ב-Thread נפרד כדי שנוכל לשלוט בזמן הסגירה
+    wst = threading.Thread(target=ws.run_forever)
+    wst.daemon = True
+    wst.start()
     
-    # המתנה של 5 דקות כדי להבטיח צבירת נתונים
     print("📡 Monitoring Hormuz Strait for 5 minutes...")
-    time.sleep(300) 
+    time.sleep(300) # האזנה למשך 5 דקות
     ws.close()
     print("✅ Collection cycle complete.")
 
