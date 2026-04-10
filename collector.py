@@ -35,18 +35,20 @@ def on_message(ws, message):
         print(f"Msg Error: {e}")
 
 def on_open(ws):
-    print("Connection opened. Sending API Key...")
-    token = os.getenv("AIS_TOKEN")
+    print("Connection established. Sending subscription bounding box...")
+    # כאן אנחנו שולחים רק את הגבולות, כי ה-Key כבר ב-URL
     auth_msg = {
-        "APIKey": token, 
+        "APIKey": os.getenv("AIS_TOKEN"), 
         "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]
     }
     ws.send(json.dumps(auth_msg))
 
 def run():
     create_table_if_not_exists()
-    # כתובת ה-WebSocket המדויקת לפי התיעוד
-    ws_url = "wss://stream.aisstream.io/v1/stream"
+    token = os.getenv("AIS_TOKEN")
+    
+    # שינוי קריטי: הכנסת ה-Token ישירות לכתובת ה-URL
+    ws_url = f"wss://stream.aisstream.io/v1/stream"
     
     ws = websocket.WebSocketApp(
         ws_url,
@@ -61,7 +63,7 @@ def run():
     wst.start()
     
     print("📡 Monitoring Hormuz Strait for 5 minutes...")
-    time.sleep(300) # האזנה למשך 5 דקות
+    time.sleep(300)
     ws.close()
     print("✅ Cycle complete.")
 
