@@ -2,7 +2,7 @@ name: Hourly Ship Update
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # ירוץ בתחילת כל שעה עגולה
+   - cron: '0 6,18 * * *'
     
 jobs:
   update_db:
