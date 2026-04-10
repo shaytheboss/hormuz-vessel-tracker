@@ -32,23 +32,21 @@ def on_message(ws, message):
             conn.close()
             print(f"Captured: {meta.get('ShipName')}")
     except Exception as e:
-        print(f"Msg Error: {e}")
+        print(f"Error: {e}")
 
 def on_open(ws):
-    print("Connection established. Sending subscription bounding box...")
-    # כאן אנחנו שולחים רק את הגבולות, כי ה-Key כבר ב-URL
+    print("Connection established. Sending subscription...")
+    token = os.getenv("AIS_TOKEN")
     auth_msg = {
-        "APIKey": os.getenv("AIS_TOKEN"), 
+        "APIKey": token, 
         "BoundingBoxes": [[[26.0, 55.0], [27.5, 57.0]]]
     }
     ws.send(json.dumps(auth_msg))
 
 def run():
     create_table_if_not_exists()
-    token = os.getenv("AIS_TOKEN")
-    
-    # שינוי קריטי: הכנסת ה-Token ישירות לכתובת ה-URL
-    ws_url = f"wss://stream.aisstream.io/v1/stream"
+    # כתובת ה-WebSocket הרשמית
+    ws_url = "wss://stream.aisstream.io/v1/stream"
     
     ws = websocket.WebSocketApp(
         ws_url,
