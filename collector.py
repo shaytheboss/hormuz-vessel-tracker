@@ -32,10 +32,10 @@ def on_message(ws, message):
             conn.close()
             print(f"Captured: {meta.get('ShipName')}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Msg Error: {e}")
 
 def on_open(ws):
-    print("Connection established. Sending subscription...")
+    print("🚀 Connection successful! Sending subscription...")
     token = os.getenv("AIS_TOKEN")
     auth_msg = {
         "APIKey": token, 
@@ -45,25 +45,28 @@ def on_open(ws):
 
 def run():
     create_table_if_not_exists()
-    # כתובת ה-WebSocket הרשמית
+    
+    # הכתובת בגרסת v1, אבל עם הגדרות חיבור עמוקות יותר
     ws_url = "wss://stream.aisstream.io/v1/stream"
     
     ws = websocket.WebSocketApp(
         ws_url,
         on_open=on_open,
         on_message=on_message,
-        on_error=lambda ws, err: print(f"Socket Error: {err}"),
-        on_close=lambda ws, status, msg: print(f"Closed: {status} - {msg}")
+        on_error=lambda ws, err: print(f"❌ Socket Error: {err}"),
+        on_close=lambda ws, status, msg: print(f"⏹️ Closed: {status} - {msg}"),
+        # הוספת כותרות כדי למנוע חסימת בוטים
+        header={"User-Agent": "Mozilla/5.0"}
     )
 
     wst = threading.Thread(target=ws.run_forever)
     wst.daemon = True
     wst.start()
     
-    print("📡 Monitoring Hormuz Strait for 5 minutes...")
+    print("📡 Monitoring Hormuz Strait... Waiting for connection.")
     time.sleep(300)
     ws.close()
-    print("✅ Cycle complete.")
+    print("✅ Process finished.")
 
 if __name__ == "__main__":
     run()
