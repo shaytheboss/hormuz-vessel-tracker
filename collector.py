@@ -45,18 +45,16 @@ def on_open(ws):
 
 def run():
     create_table_if_not_exists()
-    
-    # הכתובת בגרסת v1, אבל עם הגדרות חיבור עמוקות יותר
     ws_url = "wss://stream.aisstream.io/v1/stream"
     
+    # הוספת subprotocols - זה לעיתים קרובות הפתרון ל-404 ב-WebSockets
     ws = websocket.WebSocketApp(
         ws_url,
         on_open=on_open,
         on_message=on_message,
         on_error=lambda ws, err: print(f"❌ Socket Error: {err}"),
         on_close=lambda ws, status, msg: print(f"⏹️ Closed: {status} - {msg}"),
-        # הוספת כותרות כדי למנוע חסימת בוטים
-        header={"User-Agent": "Mozilla/5.0"}
+        subprotocols=["aisstream"] 
     )
 
     wst = threading.Thread(target=ws.run_forever)
