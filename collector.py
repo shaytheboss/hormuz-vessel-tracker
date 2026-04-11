@@ -5,7 +5,6 @@ DURATION = int(os.getenv("COLLECTION_SECONDS", "300"))
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
-    # איפוס הטבלה כדי לוודא התאמה למבנה החדש (10 עמודות)
     conn.execute('DROP TABLE IF EXISTS ship_logs') 
     conn.execute('''CREATE TABLE ship_logs
         (mmsi TEXT, name TEXT, ship_type TEXT, country TEXT,
@@ -19,8 +18,6 @@ def on_message(ws, message):
         msg = json.loads(message)
         meta = msg.get("MetaData", {})
         payload = msg.get("Message", {})
-        
-        # הוצאת נתונים מהודעות מיקום וסטטיסטיקה
         pos = payload.get("PositionReport", {})
         static = payload.get("ShipStaticData", {})
         
@@ -29,10 +26,16 @@ def on_message(ws, message):
         
         if not (meta and lat and lon): return
 
+        # הגדרת אזורים מדויקת בתוך הקוד
+        region = "Unknown"
+        if 26.0 <= lat <= 27.5 and 55.0 <= lon <= 57.0:
+            region = "Hormuz"
+        elif 28.0 <= lat <= 33.0 and 31.0 <= lon <= 35.0:
+            region = "Suez"
+        else:
+            return # אם זה לא באזורים האלו, אל תשמור (חוסך מקום)
+
         conn = sqlite3.connect(DB_PATH)
-        # זיהוי אזור
-        region = "Hormuz" if lon > 45 else "Suez"
-        
         conn.execute(
             "INSERT INTO ship_logs VALUES (?,?,?,?,?,?,?,?,?,?)",
             (str(meta.get("MMSI")),
@@ -50,20 +53,15 @@ def on_message(ws, message):
 
 def on_open(ws):
     token = os.environ.get("AIS_TOKEN", "")
-    # הודעת הרישום שעבדה לקולגה (v0 style)
+    # חזרה לתיבה הרחבה שעבדה ב-100% קודם
     ws.send(json.dumps({
         "APIKey": token,
-        "BoundingBoxes": [
-            [[26.0, 55.8], [27.4, 56.6]], # הורמוז מצומצם
-            [[29.5, 32.2], [31.5, 32.6]]  # סואץ
-        ],
-        "FilterMessageTypes": ["PositionReport", "ShipStaticData"]
+        "BoundingBoxes": [[[20.0, 30.0], [35.0, 65.0]]] 
     }))
-    print("📡 Monitoring active on v0...")
+    print("📡 Monitoring broad area on v0...")
 
 def run():
     init_db()
-    # חזרה לכתובת שעבדה ב-100%
     ws = websocket.WebSocketApp(
         "wss://stream.aisstream.io/v0/stream",
         on_open=on_open, on_message=on_message,
