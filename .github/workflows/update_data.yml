@@ -2,7 +2,7 @@ name: Maritime Data Update
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # רץ בכל שעה. לשינוי לכל 4 שעות: '0 */4 * * *'
+  - cron: '0 */6 * * *'
 
 jobs:
   update_db:
